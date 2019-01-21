@@ -62,6 +62,8 @@ class Blockchain {
 
 		// Store the new block to the levelDB
 		await addLevelDBData(newBlock.height, JSON.stringify(newBlock));
+
+		return newBlock;
 	}
 
 	// Get block height
@@ -177,7 +179,7 @@ class BlockAPI {
      * Initilization of all the controllers
      */
 	initControllers() {
-		require("./BlockController.js")(this.app);
+		new BlockController(this.app);
 	}
 
     /**
@@ -192,10 +194,95 @@ class BlockAPI {
 
 }
 
+/**
+ * Controller Definition to encapsulate routes to work with blocks
+ */
+class BlockController {
+
+    /**
+     * Constructor to create a new BlockController, you need to initialize here all your endpoints
+     * @param {*} app 
+     */
+	constructor(app) {
+		this.app = app;
+		this.blockchain = new Blockchain;
+		this.getBlockByIndex();
+		this.postNewBlock();
+	}
+
+    /**
+     * Implement a GET Endpoint to retrieve a block by index, url: "/api/block/:index"
+     */
+	getBlockByIndex() {
+		this.app.get("/block/:index", async (req, res) => {
+			// Convert the index parameter to an integer (index value)
+			var stridx = req.params.index;
+			var idx = parseInt(stridx, 10);
+
+			// Validate the index parameter
+			if (isNaN(idx)) {
+				console.log('ERROR: index value is not a number:', stridx);
+				res.status(400).send({ error: 'index value: ' + stridx + ' is not a valid number' });
+				return;
+			}
+
+			// Fetch the number of blocks in the blockchain
+			var totBlks = await numBlocks();
+
+			// Is the index out of range?
+			if (idx >= totBlks || idx < 0) {
+				// Referring to a block that does not exist
+				console.log('ERROR: block with index:', stridx, 'does not exist');
+				res.status(404).send({ error: 'block # ' +  stridx + ' does not exist'});
+				return;
+			}
+
+			// Fetch the block index by ':index'
+			var jstr = await this.blockchain.getBlock(idx);
+
+			// Return the data to the caller
+			console.log('INFO: returning to the caller with block:', jstr);
+			res.status(200).json(jstr);
+		});
+	}
+
+    /**
+     * Implement a POST Endpoint to add a new Block, url: "/api/block"
+     */
+	postNewBlock() {
+		this.app.post("/block", async (req, res) => {
+			// Read the request body data
+			var rBody = req.body.body;
+
+			// Is the request body empty?
+			if (rBody == undefined || rBody == "") {
+				// block data missing
+				console.log('ERROR: block data is missing; check your request and try again');
+				res.status(400).send({ error: 'block data is missing; check your request and try again' });
+				return;
+			}
+
+			// Create a new Block
+			var tBlock = new Block;
+			tBlock.body = rBody; // Set the Block data
+
+			// Add block to the blockchain
+			var rBlock = await this.blockchain.addBlock(tBlock);
+
+			// Write informational console messages
+			console.log('INFO: just created a new block with data:', rBlock);
+
+			// Return to the caller
+			res.status(200).json(rBlock);
+		});
+	}
+}
+
 new BlockAPI();
 
 module.exports = {
 	Block: Block,
 	Blockchain: Blockchain,
-	BlockAPI: BlockAPI
+	BlockAPI: BlockAPI,
+	BlockController: BlockController
 }

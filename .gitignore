@@ -75,3 +75,7 @@ typings/
 # FuseBox cache
 .fusebox/
 .DS_Store
+chaindata/CURRENT
+chaindata/LOCK
+chaindata/LOG
+chaindata/MANIFEST-000002
